@@ -1,27 +1,42 @@
-name: Build APK
-on: [push]
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.22.0'
-          channel: 'stable'
-      - name: Fix Flutter project
-        run: |
-          ls -la
-          if [ ! -d "android" ]; then
-            flutter create . --platforms=android --project-name=gn_rs8_pro --org=com.echayeb --no-pub
-          fi
-      - run: flutter pub get
-      - run: flutter build apk --release
-      - uses: actions/upload-artifact@v4
-        with:
-          name: gn-rs8-pro-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+import 'dart:io';
+import 'dart:async';
+
+class GnProtocol {
+  static const String defaultIp = '192.168.8.100';
+  static const int port = 20000; // البورت لي درتو انت
+  Socket? _socket;
+  int? connectedPort;
+
+  Future<bool> connect({String? ip}) async {
+    try {
+      final targetIp = ip ?? defaultIp;
+      print('محاولة الاتصال $targetIp:$port');
+      _socket = await Socket.connect(targetIp, port, timeout: Duration(seconds: 3));
+      connectedPort = port;
+      
+      // بعث Bind Code تاعك
+      String bindCode = '210503352505';
+      _socket!.write('AUTH:$bindCode\n');
+      await _socket!.flush();
+      
+      return true;
+    } catch (e) {
+      print('فشل: $e');
+      return false;
+    }
+  }
+
+  void sendKey(String key) {
+    try {
+      _socket?.write('KEY:$key\r\n');
+      print('إرسال: $key');
+    } catch(e){
+      print('خطأ إرسال: $e');
+    }
+  }
+
+  void disconnect() {
+    _socket?.close();
+    _socket = null;
+  }
+}
