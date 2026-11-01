@@ -9,16 +9,24 @@ class PortStatusWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 140,
-      decoration: BoxDecoration(
-        color: Colors.black87,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.greenAccent),
-      ),
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(12)),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.all(6),
-            child: Text('فحص: $ip',
-                style: const TextStyle(color: Colors.white, fontSize: 12)),
+          Text('نتائج فحص $ip:', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: ports.map((p) => Chip(
+              label: Text('${p.port}'),
+              backgroundColor: p.isOpen ? Colors.green : Colors.red.shade900,
+              labelStyle: TextStyle(color: Colors.white, fontSize: 12),
+              avatar: Icon(p.isOpen ? Icons.check : Icons.close, color: Colors.white, size: 14),
+            )).toList(),
           ),
+        ],
+      ),
+    );
+  }
+}
