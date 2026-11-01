@@ -1,121 +1,140 @@
 import 'package:flutter/material.dart';
-import 'services/connection_service.dart';
-import 'pages/servers_page.dart';
+import 'dart:io';
+import 'services/port_scanner.dart';
+import 'widgets/port_status_widget.dart';
 
-void main() => runApp(MaterialApp(debugShowCheckedModeBanner: false, home: RemotePage()));
+void main() => runApp(const GnRs8App());
+
+class GnRs8App extends StatelessWidget {
+  const GnRs8App({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'GN-RS8 Beautiful',
+      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
+      home: const RemotePage(),
+    );
+  }
+}
 
 class RemotePage extends StatefulWidget {
+  const RemotePage({super.key});
   @override
   State<RemotePage> createState() => _RemotePageState();
 }
 
 class _RemotePageState extends State<RemotePage> {
-  final conn = ConnectionService();
-  String status = 'غير متصل - فعل G-MScreen في الرسيفر Menu > Réseau';
-  bool loading = false;
+  String ip = '192.168.1.15';
+  List<PortInfo> ports = [];
+  bool scanning = false;
+  bool connected = false;
+  Socket? socket;
 
-  Future<void> doConnect() async {
-    setState(() => loading = true);
-    bool ok = await conn.connect();
-    setState(() {
-      loading = false;
-      status = ok ? '✅ متصل ${conn.connectedIp}:${conn.connectedPort}' : '❌ فشل - تأكد نفس WiFi (192.168.8.x)';
-    });
+  Future<void> doScan() async {
+    setState(() { scanning = true; ports = []; });
+    var result = await PortScanner.scanReceiver(ip);
+    setState(() { ports = result; scanning = false; });
   }
 
-  Widget btn(String label, {Color? c}) => Expanded(
-    child: Container(
-      height: 62,
-      margin: EdgeInsets.all(4),
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: c ?? Colors.white,
-          foregroundColor: Colors.black87,
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
-        ),
-        onPressed: () async {
-          try {
-            await conn.sendKey(label);
-          } catch(e){
-            setState(()=> status = 'غير متصل - اضغط اتصال');
-          }
-        },
-        child: FittedBox(child: Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-      ),
-    ),
-  );
+  Future<void> doConnect() async {
+    try {
+      socket = await Socket.connect(ip, 20000, timeout: const Duration(seconds: 2));
+      socket!.write('KYN\x01210503352505\n');
+      await socket!.flush();
+      setState(() { connected = true; });
+    } catch (e) {
+      setState(() { connected = false; });
+      if(mounted){
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل: $e')));
+      }
+    }
+  }
+
+  void sendKey(String k){
+    socket?.write('KEY:$k\r\n');
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFF5F5F5),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text('GN-RS8 Plus'),
+        title: const Text('GN-RS8 Pro - Beautiful'),
         backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 1,
         actions: [
-          IconButton(
-            icon: Icon(Icons.dns, color: Colors.blue),
-            onPressed: ()=> Navigator.push(context, MaterialPageRoute(builder: (_)=> ServersPage())),
-          )
+          Icon(Icons.circle, color: connected ? Colors.green : Colors.red, size: 14),
+          const SizedBox(width: 12),
         ],
       ),
-      body: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(12),
-            color: conn.isConnected ? Colors.green[100] : Colors.red[100],
-            child: Text(status, textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-          Padding(
-            padding: EdgeInsets.all(8),
-            child: Row(
+      body: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            // خانة الـ IP
+            Row(
               children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      icon: Icon(Icons.wifi),
-                      label: Text(loading ? 'نبحث...' : 'إتصال'),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
-                      onPressed: doConnect,
-                    ),
-                  ),
-                ),
-                SizedBox(width: 8),
-                SizedBox(
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    icon: Icon(Icons.dns),
-                    label: Text('سيرفرات'),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
-                    onPressed: ()=> Navigator.push(context, MaterialPageRoute(builder: (_)=> ServersPage())),
-                  ),
-                ),
+                Expanded(child: TextField(
+                  decoration: const InputDecoration(labelText: 'IP الرسيفر', border: OutlineInputBorder()),
+                  controller: TextEditingController(text: ip),
+                  onChanged: (v)=> ip=v,
+                )),
+                const SizedBox(width: 8),
+                ElevatedButton(onPressed: doScan, child: Text(scanning ? '...' : 'فحص البورتات')),
               ],
             ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.all(6),
-              children: [
-                Row(children: [btn('POWER', c: Colors.red[200]), btn('MUTE'), btn('1'), btn('2')]),
-                Row(children: [btn('3'), btn('4'), btn('5'), btn('6')]),
-                Row(children: [btn('7'), btn('8'), btn('9'), btn('0')]),
-                Row(children: [btn('MENU'), btn('EXIT'), btn('OK', c: Colors.blue[100]), btn('INFO')]),
-                Row(children: [btn('UP'), btn('DOWN'), btn('LEFT'), btn('RIGHT')]),
-                Row(children: [btn('VOL+'), btn('VOL-'), btn('RED', c: Colors.red[100]), btn('GREEN', c: Colors.green[100])]),
-                Row(children: [btn('YELLOW', c: Colors.yellow[100]), btn('BLUE', c: Colors.blue[100]), Expanded(child: SizedBox()), Expanded(child: SizedBox())]),
-                SizedBox(height: 20),
-                Center(child: Text('G-MScreen Pro - Bind: 210503352505', style: TextStyle(color: Colors.grey))),
-              ],
+            const SizedBox(height: 10),
+            // الشاشة الصغيرة لي طلبتها
+            if (ports.isNotEmpty) PortStatusWidget(ports: ports, ip: ip),
+            if (ports.isEmpty && !scanning)
+              Container(
+                height: 80,
+                width: double.infinity,
+                decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(12)),
+                child: const Center(child: Text('اضغط فحص البورتات لتعرف أن التطبيق يشتغل', style: TextStyle(color: Colors.white70))),
+              ),
+            if (scanning) const LinearProgressIndicator(),
+            const SizedBox(height: 10),
+            ElevatedButton.icon(
+              onPressed: doConnect,
+              icon: const Icon(Icons.wifi),
+              label: Text(connected ? 'متصل $ip:20000' : 'اتصال'),
+              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: connected ? Colors.green : Colors.blue, foregroundColor: Colors.white),
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            // الريموت الأبيض الجميل
+            Expanded(
+              child: GridView.count(
+                crossAxisCount: 3,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                children: [
+                  _btn('POWER', Colors.red),
+                  _btn('MUTE', Colors.grey),
+                  _btn('TV/RADIO', Colors.grey),
+                  _btn('1', Colors.white),
+                  _btn('2', Colors.white),
+                  _btn('3', Colors.white),
+                  _btn('VOL+', Colors.blue),
+                  _btn('OK', Colors.orange),
+                  _btn('CH+', Colors.blue),
+                  _btn('VOL-', Colors.blue),
+                  _btn('MENU', Colors.grey),
+                  _btn('CH-', Colors.blue),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _btn(String label, Color color){
+    return ElevatedButton(
+      onPressed: connected ? () => sendKey(label) : null,
+      style: ElevatedButton.styleFrom(backgroundColor: color, foregroundColor: color==Colors.white ? Colors.black : Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+      child: Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
     );
   }
 }
