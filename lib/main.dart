@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'services/connection_service.dart';
+import 'pages/servers_page.dart';
 
 void main() => runApp(MaterialApp(debugShowCheckedModeBanner: false, home: RemotePage()));
 
@@ -36,7 +37,6 @@ class _RemotePageState extends State<RemotePage> {
         onPressed: () async {
           try {
             await conn.sendKey(label);
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(label), duration: Duration(milliseconds: 300)));
           } catch(e){
             setState(()=> status = 'غير متصل - اضغط اتصال');
           }
@@ -51,10 +51,16 @@ class _RemotePageState extends State<RemotePage> {
     return Scaffold(
       backgroundColor: Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: Text('GN-RS8 Plus - ${conn.connectedIp.isEmpty ? "192.168.8.100" : conn.connectedIp}'),
+        title: Text('GN-RS8 Plus'),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 1,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.dns, color: Colors.blue),
+            onPressed: ()=> Navigator.push(context, MaterialPageRoute(builder: (_)=> ServersPage())),
+          )
+        ],
       ),
       body: Column(
         children: [
@@ -66,15 +72,30 @@ class _RemotePageState extends State<RemotePage> {
           ),
           Padding(
             padding: EdgeInsets.all(8),
-            child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                icon: Icon(Icons.wifi),
-                label: Text(loading ? 'نبحث...' : 'إتصال'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
-                onPressed: doConnect,
-              ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      icon: Icon(Icons.wifi),
+                      label: Text(loading ? 'نبحث...' : 'إتصال'),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+                      onPressed: doConnect,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8),
+                SizedBox(
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    icon: Icon(Icons.dns),
+                    label: Text('سيرفرات'),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
+                    onPressed: ()=> Navigator.push(context, MaterialPageRoute(builder: (_)=> ServersPage())),
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
