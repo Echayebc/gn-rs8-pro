@@ -13,6 +13,12 @@ jobs:
         with:
           flutter-version: '3.22.0'
           channel: 'stable'
+      - name: Fix Flutter project
+        run: |
+          ls -la
+          if [ ! -d "android" ]; then
+            flutter create . --platforms=android --project-name=gn_rs8_pro --org=com.echayeb --no-pub
+          fi
       - run: flutter pub get
       - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
